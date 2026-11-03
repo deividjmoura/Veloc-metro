@@ -32,7 +32,7 @@ Sem MAPS_API_KEY, o mapa pode ficar em branco. Sem DIRECTIONS_API_KEY, a rota in
 ## Funcionalidades 0.3.0
 - Interface esportiva em orientação horizontal.
 - Velocímetro GPS com alternância km/h e mph.
-- Velocidade máxima da sessão.
+- Velocidade máxima da sessão e média real da viagem desde o início do contador (inclui períodos parado).
 - Distância da viagem, reset e odômetro acumulado persistido.
 - Google Maps integrado no painel direito, marcador GPS e centralização.
 - Campo de destino e cálculo de rota de carro via Directions API.
@@ -41,11 +41,10 @@ Sem MAPS_API_KEY, o mapa pode ficar em branco. Sem DIRECTIONS_API_KEY, a rota in
 - Alternativa para abrir a navegação no Google Maps externo.
 
 ## Pendências conhecidas
-- Média real da viagem (métrica atual ainda provisória).
 - Histórico de viagens com Room.
 - Rastreamento em segundo plano com foreground service e notificação persistente.
 - Backend protegido para chamadas de rotas antes de publicar em produção.
 - Tratamento de destinos ambíguos com seleção de resultados/Places.
-- Compilação e testes em aparelho físico ainda precisam ser realizados no Android Studio.
+- Compilação automatizada pelo GitHub Actions; testes funcionais em aparelho físico ainda precisam ser realizados.
 
 > O odômetro começa em zero nesta instalação e acumula distância GPS válida. Não representa o hodômetro físico do veículo.
