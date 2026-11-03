@@ -87,6 +87,7 @@ private fun SpeedometerApp() {
     val tripDao = remember { tripDatabase.tripRecordDao() }
     val tripHistory by tripDao.observeAll().collectAsState(initial = emptyList())
     var showHistory by remember { mutableStateOf(false) }
+    var historyQuery by remember { mutableStateOf("") }
     var speed by remember { mutableFloatStateOf(0f) }
     var tripKm by remember { mutableDoubleStateOf(prefs.getFloat("trip_km", 0f).toDouble()) }
     var totalKm by remember { mutableDoubleStateOf(prefs.getFloat("total_km", 0f).toDouble()) }
@@ -223,7 +224,19 @@ private fun SpeedometerApp() {
                                 when {
                                     origin == null -> routeError = "Aguardando localização GPS para calcular a rota."
                                     target.isBlank() -> routeError = "Informe um destino."
-                                    BuildConfig.DIRECTIONS_API_KEY.isBlank() -> routeError = "Configure DIRECTIONS_API_KEY em local.properties."
+                                    BuildConfig.DIRECTIONS_API_KEY.isBlank() -> {
+                                        val uri = Uri.parse(
+                                            "https://www.google.com/maps/dir/?api=1" +
+                                                "&origin=${origin.latitude},${origin.longitude}" +
+                                                "&destination=${Uri.encode(target)}&travelmode=driving"
+                                        )
+                                        try {
+                                            context.startActivity(Intent(Intent.ACTION_VIEW, uri))
+                                            routeError = "Navegação aberta no Google Maps. Para desenhar a rota aqui, configure a Directions API."
+                                        } catch (_: Exception) {
+                                            routeError = "Não foi possível abrir um app de mapas neste dispositivo."
+                                        }
+                                    }
                                     else -> scope.launch {
                                         routeLoading = true
                                         routeError = null
@@ -293,36 +306,66 @@ private fun SpeedometerApp() {
                 onDismissRequest = { showHistory = false },
                 title = { Text("HISTÓRICO DE VIAGENS", fontWeight = FontWeight.Black) },
                 text = {
-                    if (tripHistory.isEmpty()) {
-                        Text("Nenhuma viagem salva ainda. Use FINALIZAR depois de percorrer uma distância para guardar o registro.")
-                    } else {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            items(tripHistory, key = { it.id }) { trip ->
-                                Column(
-                                    Modifier.fillMaxWidth().background(Panel, RoundedCornerShape(10.dp)).padding(10.dp)
-                                ) {
-                                    Text(
-                                        SimpleDateFormat("dd/MM/yyyy • HH:mm", Locale.getDefault()).format(Date(trip.finishedAt)),
-                                        color = Accent,
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Text(
-                                        String.format(Locale.getDefault(), "%.2f km  •  média %.1f km/h  •  máxima %.1f km/h", trip.distanceKm, trip.averageKmh, trip.maxSpeedKmh),
-                                        color = White,
-                                        fontSize = 11.sp
-                                    )
-                                    Text("Duração: ${trip.durationMillis / 60000} min", color = Muted, fontSize = 9.sp)
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        if (tripHistory.isNotEmpty()) {
+                            OutlinedTextField(
+                                value = historyQuery,
+                                onValueChange = { historyQuery = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                placeholder = { Text("Pesquisar por data, km ou velocidade") },
+                                leadingIcon = { Icon(Icons.Default.Refresh, contentDescription = null) },
+                                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp, color = White),
+                                shape = RoundedCornerShape(10.dp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = Accent,
+                                    unfocusedBorderColor = Color(0xFF263442),
+                                    focusedTextColor = White,
+                                    unfocusedTextColor = White
+                                )
+                            )
+                        }
+                        val normalizedQuery = historyQuery.trim()
+                        val matchingTrips = tripHistory.filter { trip ->
+                            val dateText = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
+                                .format(Date(trip.finishedAt))
+                            val searchable = dateText + " " + String.format(
+                                Locale.getDefault(), "%.2f %.1f %.1f",
+                                trip.distanceKm, trip.averageKmh, trip.maxSpeedKmh
+                            )
+                            normalizedQuery.isBlank() || searchable.contains(normalizedQuery, ignoreCase = true)
+                        }
+                        when {
+                            tripHistory.isEmpty() -> Text("Nenhuma viagem salva ainda. Use FINALIZAR depois de percorrer uma distância para guardar o registro.")
+                            matchingTrips.isEmpty() -> Text("Nenhuma viagem encontrada para essa pesquisa.", color = Muted)
+                            else -> LazyColumn(
+                                modifier = Modifier.fillMaxWidth().heightIn(max = 320.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                items(matchingTrips, key = { it.id }) { trip ->
+                                    Column(
+                                        Modifier.fillMaxWidth().background(Panel, RoundedCornerShape(10.dp)).padding(10.dp)
+                                    ) {
+                                        Text(
+                                            SimpleDateFormat("dd/MM/yyyy • HH:mm", Locale.getDefault()).format(Date(trip.finishedAt)),
+                                            color = Accent,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            String.format(Locale.getDefault(), "%.2f km  •  média %.1f km/h  •  máxima %.1f km/h", trip.distanceKm, trip.averageKmh, trip.maxSpeedKmh),
+                                            color = White,
+                                            fontSize = 11.sp
+                                        )
+                                        Text(String.format(Locale.getDefault(), "Duração: %d min", trip.durationMillis / 60000), color = Muted, fontSize = 9.sp)
+                                    }
                                 }
                             }
                         }
                     }
                 },
                 confirmButton = {
-                    TextButton(onClick = { showHistory = false }) { Text("FECHAR") }
+                    TextButton(onClick = { showHistory = false; historyQuery = "" }) { Text("FECHAR") }
                 },
                 dismissButton = {
                     if (tripHistory.isNotEmpty()) {
