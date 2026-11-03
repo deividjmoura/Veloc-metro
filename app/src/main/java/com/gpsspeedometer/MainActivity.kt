@@ -397,7 +397,7 @@ private fun requestDirections(origin: LatLng, destination: String, apiKey: Strin
     }
 }
 
-private fun decodePolyline(encoded: String): List<LatLng> {
+internal fun decodePolyline(encoded: String): List<LatLng> {
     val points = ArrayList<LatLng>()
     var index = 0
     var lat = 0
@@ -409,6 +409,8 @@ private fun decodePolyline(encoded: String): List<LatLng> {
         do {
             require(index < encoded.length) { "Polyline inválida recebida do serviço de rotas." }
             byte = encoded[index++].code - 63
+            require(byte in 0..63) { "Polyline contém caractere inválido." }
+            require(shift <= 30) { "Polyline excede o limite de coordenadas suportado." }
             result = result or ((byte and 0x1f) shl shift)
             shift += 5
         } while (byte >= 0x20)
