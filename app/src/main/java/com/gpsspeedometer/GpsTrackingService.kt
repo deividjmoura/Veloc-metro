@@ -133,12 +133,7 @@ class GpsTrackingService : Service() {
     }
 
     private fun buildNotification(speedKmh: Float): Notification =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            Notification.Builder(this, CHANNEL_ID)
-        } else {
-            @Suppress("DEPRECATION")
-            Notification.Builder(this)
-        }
+        Notification.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_menu_mylocation)
             .setContentTitle("GPS Speedometer • rastreamento ativo")
             .setContentText(String.format(Locale.getDefault(), "Velocidade atual: %.0f km/h", speedKmh))
