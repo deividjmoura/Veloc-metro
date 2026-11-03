@@ -38,4 +38,18 @@ class PolylineDecoderTest {
             decodePolyline("\u0000")
         }
     }
+    @Test
+    fun rejectsInvalidLongitudeEncoding() {
+        assertThrows(IllegalArgumentException::class.java) {
+            decodePolyline("?\\u0000")
+        }
+    }
+
+    @Test
+    fun rejectsOverlongCoordinateEncoding() {
+        assertThrows(IllegalArgumentException::class.java) {
+            decodePolyline("}".repeat(8))
+        }
+    }
+
 }
