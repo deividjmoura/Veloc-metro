@@ -3,7 +3,8 @@ name: Android build
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: ["**"]
+  workflow_dispatch:
 
 permissions:
   contents: read
