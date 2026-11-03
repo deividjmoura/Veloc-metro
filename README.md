@@ -39,6 +39,8 @@ Sem MAPS_API_KEY, o mapa pode ficar em branco. Sem DIRECTIONS_API_KEY, a rota in
 - Desenho da polyline da rota, marcador do destino e enquadramento automático.
 - Exibição da distância e duração estimada retornadas pelo serviço.
 - Alternativa para abrir a navegação no Google Maps externo.
+- Rastreamento em segundo plano por Foreground Service iniciado explicitamente pelo usuário.
+- Notificação persistente com velocidade atual; a coleta continua ao minimizar o app ou bloquear a tela enquanto o serviço estiver ativo.
 
 ## Histórico de viagens
 
@@ -49,7 +51,7 @@ As viagens finalizadas pelo botão **FINALIZAR** são salvas localmente em banco
 Execute os testes unitários com `gradle testDebugUnitTest`. O GitHub Actions executa essa tarefa antes de gerar o APK debug.
 
 ## Pendências conhecidas
-- Rastreamento em segundo plano com foreground service e notificação persistente.
+- Validar em aparelho físico a continuidade do GPS com tela bloqueada, economia de bateria e permissões de notificação.
 - Backend protegido para chamadas de rotas antes de publicar em produção.
 - Tratamento de destinos ambíguos com seleção de resultados/Places.
 - Testes funcionais em aparelho físico para GPS, mapa, permissões e histórico.
