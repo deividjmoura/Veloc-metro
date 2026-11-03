@@ -31,7 +31,8 @@ class GpsTrackingService : Service() {
     private val listener = object : LocationListener {
         override fun onLocationChanged(location: Location) {
             if (location.accuracy > 50f) {
-                prefs.edit().putBoolean("has_fix", false).apply()
+                prefs.edit().putBoolean("has_fix", false).putFloat("speed_kmh", 0f).apply()
+                updateNotification(0f)
                 return
             }
 
@@ -97,6 +98,7 @@ class GpsTrackingService : Service() {
         startAsForeground()
         prefs.edit().putBoolean("tracking_active", true).apply()
         try {
+            locationManager.removeUpdates(listener)
             if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
                 locationManager.requestLocationUpdates(
                     LocationManager.GPS_PROVIDER, 1000L, 1f, listener, Looper.getMainLooper()
