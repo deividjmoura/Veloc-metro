@@ -40,6 +40,10 @@ Sem MAPS_API_KEY, o mapa pode ficar em branco. Sem DIRECTIONS_API_KEY, a rota in
 - Exibição da distância e duração estimada retornadas pelo serviço.
 - Alternativa para abrir a navegação no Google Maps externo.
 
+## Histórico de viagens
+
+As viagens finalizadas pelo botão **FINALIZAR** são salvas localmente em banco Room. O painel **HISTÓRICO** permite consultar data, distância, duração, velocidade média e máxima; os registros permanecem no dispositivo e podem ser apagados pela opção **LIMPAR**.
+
 ## Testes automatizados
 
 Execute os testes unitários com `gradle testDebugUnitTest`. O GitHub Actions executa essa tarefa antes de gerar o APK debug.
