@@ -275,7 +275,6 @@ private fun SpeedometerApp() {
                                 averageKmh = 0f
                                 maxSpeed = 0f
                                 tripStartedAt = 0L
-                                previousLocation = null
                                 prefs.edit().putFloat("trip_km", 0f).putLong("trip_started_at", 0L).putFloat("max_speed_kmh", 0f).apply()
                             }, contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp)) {
                                 Icon(Icons.Default.Refresh, null, modifier = Modifier.size(14.dp))
