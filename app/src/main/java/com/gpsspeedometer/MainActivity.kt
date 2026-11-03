@@ -4,9 +4,6 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.location.Location
-import android.location.LocationListener
-import android.location.LocationManager
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -96,9 +93,9 @@ private fun SpeedometerApp() {
     var maxSpeed by remember { mutableFloatStateOf(0f) }
     var averageKmh by remember { mutableFloatStateOf(0f) }
     var tripStartedAt by remember { mutableLongStateOf(prefs.getLong("trip_started_at", 0L)) }
-    var hasFix by remember { mutableStateOf(false) }\n    var trackingActive by remember { mutableStateOf(false) }
+    var hasFix by remember { mutableStateOf(false) }
+    var trackingActive by remember { mutableStateOf(false) }
     var mph by remember { mutableStateOf(false) }
-    var previousLocation by remember { mutableStateOf<Location?>(null) }
     var currentLatLng by remember { mutableStateOf<LatLng?>(null) }
     var destination by remember { mutableStateOf("") }
     var routePoints by remember { mutableStateOf<List<LatLng>>(emptyList()) }
