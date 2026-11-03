@@ -4,9 +4,6 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.location.Location
-import android.location.LocationListener
-import android.location.LocationManager
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -97,8 +94,8 @@ private fun SpeedometerApp() {
     var averageKmh by remember { mutableFloatStateOf(0f) }
     var tripStartedAt by remember { mutableLongStateOf(prefs.getLong("trip_started_at", 0L)) }
     var hasFix by remember { mutableStateOf(false) }
+    var trackingActive by remember { mutableStateOf(false) }
     var mph by remember { mutableStateOf(false) }
-    var previousLocation by remember { mutableStateOf<Location?>(null) }
     var currentLatLng by remember { mutableStateOf<LatLng?>(null) }
     var destination by remember { mutableStateOf("") }
     var routePoints by remember { mutableStateOf<List<LatLng>>(emptyList()) }
@@ -119,50 +116,49 @@ private fun SpeedometerApp() {
         permissionGranted = grants[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
             grants[Manifest.permission.ACCESS_COARSE_LOCATION] == true
     }
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) {
+        context.startForegroundService(
+            Intent(context, GpsTrackingService::class.java).setAction(GpsTrackingService.ACTION_START)
+        )
+    }
 
-    DisposableEffect(permissionGranted) {
+    LaunchedEffect(Unit) {
         if (!permissionGranted) {
             permissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
-            onDispose { }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            speed = prefs.getFloat("speed_kmh", 0f)
+            maxSpeed = prefs.getFloat("max_speed_kmh", 0f)
+            tripKm = prefs.getFloat("trip_km", 0f).toDouble()
+            totalKm = prefs.getFloat("total_km", 0f).toDouble()
+            tripStartedAt = prefs.getLong("trip_started_at", 0L)
+            hasFix = prefs.getBoolean("has_fix", false)
+            currentLatLng = if (hasFix) {
+                val lat = prefs.getFloat("current_lat", Float.NaN)
+                val lng = prefs.getFloat("current_lng", Float.NaN)
+                if (lat.isFinite() && lng.isFinite()) LatLng(lat.toDouble(), lng.toDouble()) else null
+            } else null
+            trackingActive = prefs.getBoolean("tracking_active", false)
+            delay(500L)
+        }
+    }
+
+    val startTracking = {
+        if (!permissionGranted) {
+            permissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+        } else if (android.os.Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         } else {
-            val manager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-            val listener = object : LocationListener {
-                override fun onLocationChanged(location: Location) {
-                    hasFix = location.accuracy <= 50f
-                    if (location.accuracy <= 50f) currentLatLng = LatLng(location.latitude, location.longitude)
-                    if (location.hasSpeed() && location.accuracy <= 50f) {
-                        speed = (location.speed * 3.6f).coerceAtLeast(0f)
-                        maxSpeed = maxOf(maxSpeed, speed)
-                    }
-                    if (location.accuracy <= 25f) {
-                        if (tripStartedAt == 0L) {
-                            tripStartedAt = System.currentTimeMillis()
-                            prefs.edit().putLong("trip_started_at", tripStartedAt).apply()
-                        }
-                        val previous = previousLocation
-                        if (previous != null) {
-                            val delta = previous.distanceTo(location).toDouble() / 1000.0
-                            if (delta in 0.001..0.5) {
-                                tripKm += delta
-                                totalKm += delta
-                                prefs.edit().putFloat("trip_km", tripKm.toFloat()).putFloat("total_km", totalKm.toFloat()).apply()
-                            }
-                        }
-                        previousLocation = location
-                    }
-                }
-            }
-            try {
-                if (manager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
-                    manager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000L, 1f, listener, context.mainLooper)
-                }
-                if (manager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
-                    manager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 2000L, 2f, listener, context.mainLooper)
-                }
-            } catch (_: SecurityException) {
-                hasFix = false
-            }
-            onDispose { manager.removeUpdates(listener) }
+            context.startForegroundService(
+                Intent(context, GpsTrackingService::class.java).setAction(GpsTrackingService.ACTION_START)
+            )
         }
     }
 
@@ -182,7 +178,14 @@ private fun SpeedometerApp() {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.weight(1f)) {
                         Text("GPS SPEEDOMETER", color = White, fontWeight = FontWeight.Black, letterSpacing = 2.sp, fontSize = 17.sp)
-                        Text("PERFORMANCE DASHBOARD / v0.3", color = Muted, fontSize = 9.sp, letterSpacing = 1.5.sp)
+                        Text("PERFORMANCE DASHBOARD / v0.4", color = Muted, fontSize = 9.sp, letterSpacing = 1.5.sp)
+                    }
+                    TextButton(onClick = {
+                        if (trackingActive) {
+                            context.startService(Intent(context, GpsTrackingService::class.java).setAction(GpsTrackingService.ACTION_STOP))
+                        } else startTracking()
+                    }) {
+                        Text(if (trackingActive) "PAUSAR GPS" else "INICIAR GPS", color = Accent, fontWeight = FontWeight.Bold, fontSize = 10.sp)
                     }
                     Icon(Icons.Default.GpsFixed, null, tint = if (hasFix) Color(0xFF5BE0A0) else Muted)
                     Spacer(Modifier.width(5.dp))
@@ -272,8 +275,7 @@ private fun SpeedometerApp() {
                                 averageKmh = 0f
                                 maxSpeed = 0f
                                 tripStartedAt = 0L
-                                previousLocation = null
-                                prefs.edit().putFloat("trip_km", 0f).putLong("trip_started_at", 0L).apply()
+                                prefs.edit().putFloat("trip_km", 0f).putLong("trip_started_at", 0L).putFloat("max_speed_kmh", 0f).apply()
                             }, contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp)) {
                                 Icon(Icons.Default.Refresh, null, modifier = Modifier.size(14.dp))
                                 Spacer(Modifier.width(4.dp))
