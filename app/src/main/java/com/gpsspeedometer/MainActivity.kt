@@ -54,6 +54,7 @@ import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.Polyline
 import com.google.maps.android.compose.rememberCameraPositionState
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -85,6 +86,8 @@ private fun SpeedometerApp() {
     var tripKm by remember { mutableDoubleStateOf(prefs.getFloat("trip_km", 0f).toDouble()) }
     var totalKm by remember { mutableDoubleStateOf(prefs.getFloat("total_km", 0f).toDouble()) }
     var maxSpeed by remember { mutableFloatStateOf(0f) }
+    var averageKmh by remember { mutableFloatStateOf(0f) }
+    var tripStartedAt by remember { mutableLongStateOf(prefs.getLong("trip_started_at", 0L)) }
     var hasFix by remember { mutableStateOf(false) }
     var mph by remember { mutableStateOf(false) }
     var previousLocation by remember { mutableStateOf<Location?>(null) }
@@ -123,16 +126,22 @@ private fun SpeedometerApp() {
                         speed = (location.speed * 3.6f).coerceAtLeast(0f)
                         maxSpeed = maxOf(maxSpeed, speed)
                     }
-                    val previous = previousLocation
-                    if (previous != null && location.accuracy <= 25f) {
-                        val delta = previous.distanceTo(location).toDouble() / 1000.0
-                        if (delta in 0.001..0.5) {
-                            tripKm += delta
-                            totalKm += delta
-                            prefs.edit().putFloat("trip_km", tripKm.toFloat()).putFloat("total_km", totalKm.toFloat()).apply()
+                    if (location.accuracy <= 25f) {
+                        if (tripStartedAt == 0L) {
+                            tripStartedAt = System.currentTimeMillis()
+                            prefs.edit().putLong("trip_started_at", tripStartedAt).apply()
                         }
+                        val previous = previousLocation
+                        if (previous != null) {
+                            val delta = previous.distanceTo(location).toDouble() / 1000.0
+                            if (delta in 0.001..0.5) {
+                                tripKm += delta
+                                totalKm += delta
+                                prefs.edit().putFloat("trip_km", tripKm.toFloat()).putFloat("total_km", totalKm.toFloat()).apply()
+                            }
+                        }
+                        previousLocation = location
                     }
-                    previousLocation = location
                 }
             }
             try {
@@ -146,6 +155,16 @@ private fun SpeedometerApp() {
                 hasFix = false
             }
             onDispose { manager.removeUpdates(listener) }
+        }
+    }
+
+    LaunchedEffect(tripStartedAt, tripKm) {
+        while (true) {
+            averageKmh = if (tripStartedAt > 0L) {
+                val elapsedHours = ((System.currentTimeMillis() - tripStartedAt).coerceAtLeast(1L)).toDouble() / 3_600_000.0
+                (tripKm / elapsedHours).toFloat()
+            } else 0f
+            delay(1000L)
         }
     }
 
@@ -170,7 +189,7 @@ private fun SpeedometerApp() {
                         Spacer(Modifier.height(10.dp))
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             MetricCard("MÁXIMA", (if (mph) maxSpeed * .621371f else maxSpeed).roundToInt().toString(), if (mph) "mph" else "km/h", Modifier.weight(1f))
-                            MetricCard("MÉDIA*", (if (mph) speed * .621371f else speed).roundToInt().toString(), if (mph) "mph" else "km/h", Modifier.weight(1f))
+                            MetricCard("MÉDIA", (if (mph) averageKmh * .621371f else averageKmh).roundToInt().toString(), if (mph) "mph" else "km/h", Modifier.weight(1f))
                         }
                     }
                     Column(Modifier.weight(.95f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -223,8 +242,10 @@ private fun SpeedometerApp() {
                             Text("CONTADOR DE VIAGEM", color = Muted, fontSize = 9.sp, modifier = Modifier.weight(1f))
                             OutlinedButton(onClick = {
                                 tripKm = 0.0
+                                averageKmh = 0f
+                                tripStartedAt = 0L
                                 previousLocation = null
-                                prefs.edit().putFloat("trip_km", 0f).apply()
+                                prefs.edit().putFloat("trip_km", 0f).putLong("trip_started_at", 0L).apply()
                             }, contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp)) {
                                 Icon(Icons.Default.Refresh, null, modifier = Modifier.size(14.dp))
                                 Spacer(Modifier.width(4.dp))
@@ -234,7 +255,7 @@ private fun SpeedometerApp() {
                     }
                 }
                 Spacer(Modifier.height(8.dp))
-                Text("* Média provisória. Rotas internas exigem chave Directions API; navegação externa disponível.", color = Muted, fontSize = 9.sp)
+                Text("Média da viagem desde o início do contador. Rotas internas exigem chave Directions API.", color = Muted, fontSize = 9.sp)
             }
         }
     }
