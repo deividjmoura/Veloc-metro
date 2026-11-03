@@ -40,6 +40,10 @@ Sem MAPS_API_KEY, o mapa pode ficar em branco. Sem DIRECTIONS_API_KEY, a rota in
 - Exibição da distância e duração estimada retornadas pelo serviço.
 - Alternativa para abrir a navegação no Google Maps externo.
 
+## Testes automatizados
+
+Execute os testes unitários com `gradle testDebugUnitTest`. O GitHub Actions executa essa tarefa antes de gerar o APK debug.
+
 ## Pendências conhecidas
 - Histórico de viagens com Room.
 - Rastreamento em segundo plano com foreground service e notificação persistente.
