@@ -41,7 +41,7 @@ class PolylineDecoderTest {
     @Test
     fun rejectsInvalidLongitudeEncoding() {
         assertThrows(IllegalArgumentException::class.java) {
-            decodePolyline("?\\u0000")
+            decodePolyline("?\u0000")
         }
     }
 
