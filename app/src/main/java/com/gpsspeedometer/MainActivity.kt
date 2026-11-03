@@ -181,7 +181,7 @@ private fun SpeedometerApp() {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.weight(1f)) {
                         Text("GPS SPEEDOMETER", color = White, fontWeight = FontWeight.Black, letterSpacing = 2.sp, fontSize = 17.sp)
-                        Text("PERFORMANCE DASHBOARD / v0.3", color = Muted, fontSize = 9.sp, letterSpacing = 1.5.sp)
+                        Text("PERFORMANCE DASHBOARD / v0.4", color = Muted, fontSize = 9.sp, letterSpacing = 1.5.sp)
                     }
                     TextButton(onClick = {
                         if (trackingActive) {
