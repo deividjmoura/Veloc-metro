@@ -2,9 +2,16 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />
     <application android:allowBackup="true" android:label="GPS Speedometer" android:theme="@android:style/Theme.Material.Light.NoActionBar" android:supportsRtl="true">
         <meta-data android:name="com.google.android.geo.API_KEY" android:value="${MAPS_API_KEY}" />
+        <service
+            android:name=".GpsTrackingService"
+            android:exported="false"
+            android:foregroundServiceType="location" />
         <activity android:name=".MainActivity" android:screenOrientation="landscape" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
