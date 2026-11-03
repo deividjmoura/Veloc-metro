@@ -119,6 +119,13 @@ private fun SpeedometerApp() {
         permissionGranted = grants[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
             grants[Manifest.permission.ACCESS_COARSE_LOCATION] == true
     }
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) {
+        context.startForegroundService(
+            Intent(context, GpsTrackingService::class.java).setAction(GpsTrackingService.ACTION_START)
+        )
+    }
 
     LaunchedEffect(Unit) {
         if (!permissionGranted) {
