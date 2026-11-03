@@ -473,8 +473,20 @@ private fun MapNavigationPane(
             onClick = {
                 val query = destination.trim()
                 if (query.isNotEmpty()) {
-                    val uri = Uri.parse("https://www.google.com/maps/dir/?api=1&destination=${Uri.encode(query)}&travelmode=driving")
-                    context.startActivity(Intent(Intent.ACTION_VIEW, uri))
+                    val origin = currentLocation
+                    val originPart = origin?.let { "&origin=${it.latitude},${it.longitude}" } ?: ""
+                    val uri = Uri.parse(
+                        "https://www.google.com/maps/dir/?api=1" +
+                            originPart +
+                            "&destination=${Uri.encode(query)}&travelmode=driving"
+                    )
+                    try {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, uri))
+                    } catch (_: Exception) {
+                        routeError = "Não foi possível abrir o Google Maps ou navegador neste dispositivo."
+                    }
+                } else {
+                    routeError = "Informe um destino antes de abrir a navegação."
                 }
             },
             contentPadding = PaddingValues(horizontal = 3.dp, vertical = 0.dp)
