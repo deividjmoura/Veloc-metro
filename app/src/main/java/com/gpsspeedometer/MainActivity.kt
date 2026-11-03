@@ -17,6 +17,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -60,6 +62,8 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.Date
+import java.text.SimpleDateFormat
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -82,6 +86,10 @@ class MainActivity : ComponentActivity() {
 private fun SpeedometerApp() {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("trip_data", Context.MODE_PRIVATE) }
+    val tripDatabase = remember { createTripDatabase(context) }
+    val tripDao = remember { tripDatabase.tripRecordDao() }
+    val tripHistory by tripDao.observeAll().collectAsState(initial = emptyList())
+    var showHistory by remember { mutableStateOf(false) }
     var speed by remember { mutableFloatStateOf(0f) }
     var tripKm by remember { mutableDoubleStateOf(prefs.getFloat("trip_km", 0f).toDouble()) }
     var totalKm by remember { mutableDoubleStateOf(prefs.getFloat("total_km", 0f).toDouble()) }
@@ -240,16 +248,36 @@ private fun SpeedometerApp() {
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("CONTADOR DE VIAGEM", color = Muted, fontSize = 9.sp, modifier = Modifier.weight(1f))
+                            TextButton(onClick = { showHistory = true }, contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)) {
+                                Text("HISTÓRICO", color = Accent, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                            }
                             OutlinedButton(onClick = {
+                                val finishedAt = System.currentTimeMillis()
+                                val finishedDistance = tripKm
+                                val duration = if (tripStartedAt > 0L) (finishedAt - tripStartedAt).coerceAtLeast(0L) else 0L
+                                if (finishedDistance >= 0.01) {
+                                    scope.launch {
+                                        tripDao.insert(
+                                            TripRecord(
+                                                finishedAt = finishedAt,
+                                                distanceKm = finishedDistance,
+                                                durationMillis = duration,
+                                                averageKmh = averageKmh.toDouble(),
+                                                maxSpeedKmh = maxSpeed.toDouble()
+                                            )
+                                        )
+                                    }
+                                }
                                 tripKm = 0.0
                                 averageKmh = 0f
+                                maxSpeed = 0f
                                 tripStartedAt = 0L
                                 previousLocation = null
                                 prefs.edit().putFloat("trip_km", 0f).putLong("trip_started_at", 0L).apply()
                             }, contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp)) {
                                 Icon(Icons.Default.Refresh, null, modifier = Modifier.size(14.dp))
                                 Spacer(Modifier.width(4.dp))
-                                Text("RESET", fontSize = 10.sp)
+                                Text("FINALIZAR", fontSize = 10.sp)
                             }
                         }
                     }
@@ -257,6 +285,52 @@ private fun SpeedometerApp() {
                 Spacer(Modifier.height(8.dp))
                 Text("Média da viagem desde o início do contador. Rotas internas exigem chave Directions API.", color = Muted, fontSize = 9.sp)
             }
+        }
+        if (showHistory) {
+            AlertDialog(
+                onDismissRequest = { showHistory = false },
+                title = { Text("HISTÓRICO DE VIAGENS", fontWeight = FontWeight.Black) },
+                text = {
+                    if (tripHistory.isEmpty()) {
+                        Text("Nenhuma viagem salva ainda. Use FINALIZAR depois de percorrer uma distância para guardar o registro.")
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(tripHistory, key = { it.id }) { trip ->
+                                Column(
+                                    Modifier.fillMaxWidth().background(Panel, RoundedCornerShape(10.dp)).padding(10.dp)
+                                ) {
+                                    Text(
+                                        SimpleDateFormat("dd/MM/yyyy • HH:mm", Locale.getDefault()).format(Date(trip.finishedAt)),
+                                        color = Accent,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        String.format(Locale.getDefault(), "%.2f km  •  média %.1f km/h  •  máxima %.1f km/h", trip.distanceKm, trip.averageKmh, trip.maxSpeedKmh),
+                                        color = White,
+                                        fontSize = 11.sp
+                                    )
+                                    Text("Duração: ${trip.durationMillis / 60000} min", color = Muted, fontSize = 9.sp)
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showHistory = false }) { Text("FECHAR") }
+                },
+                dismissButton = {
+                    if (tripHistory.isNotEmpty()) {
+                        TextButton(onClick = { scope.launch { tripDao.deleteAll() } }) { Text("LIMPAR", color = Color(0xFFFF8A70)) }
+                    }
+                },
+                containerColor = Panel,
+                titleContentColor = White,
+                textContentColor = White
+            )
         }
     }
 }
