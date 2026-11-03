@@ -29,7 +29,7 @@ Sem MAPS_API_KEY, o mapa pode ficar em branco. Sem DIRECTIONS_API_KEY, a rota in
 3. Aguarde a sincronização do Gradle.
 4. Execute em um aparelho Android com GPS e conceda a permissão de localização.
 
-## Funcionalidades 0.3.0
+## Funcionalidades 0.4.0
 - Interface esportiva em orientação horizontal.
 - Velocímetro GPS com alternância km/h e mph.
 - Velocidade máxima da sessão e média real da viagem desde o início do contador (inclui períodos parado).
