@@ -49,10 +49,9 @@ As viagens finalizadas pelo botão **FINALIZAR** são salvas localmente em banco
 Execute os testes unitários com `gradle testDebugUnitTest`. O GitHub Actions executa essa tarefa antes de gerar o APK debug.
 
 ## Pendências conhecidas
-- Histórico de viagens com Room.
 - Rastreamento em segundo plano com foreground service e notificação persistente.
 - Backend protegido para chamadas de rotas antes de publicar em produção.
 - Tratamento de destinos ambíguos com seleção de resultados/Places.
-- Compilação automatizada pelo GitHub Actions; testes funcionais em aparelho físico ainda precisam ser realizados.
+- Testes funcionais em aparelho físico para GPS, mapa, permissões e histórico.
 
 > O odômetro começa em zero nesta instalação e acumula distância GPS válida. Não representa o hodômetro físico do veículo.
