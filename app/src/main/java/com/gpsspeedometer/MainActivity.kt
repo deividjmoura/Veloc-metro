@@ -116,13 +116,12 @@ private fun SpeedometerApp() {
     ) { grants ->
         permissionGranted = grants[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
             grants[Manifest.permission.ACCESS_COARSE_LOCATION] == true
-    }
-    val notificationPermissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) {
-        context.startForegroundService(
-            Intent(context, GpsTrackingService::class.java).setAction(GpsTrackingService.ACTION_START)
-        )
+        if (permissionGranted) {
+            ContextCompat.startForegroundService(
+                context,
+                Intent(context, GpsTrackingService::class.java).setAction(GpsTrackingService.ACTION_START)
+            )
+        }
     }
 
     LaunchedEffect(Unit) {
@@ -152,12 +151,9 @@ private fun SpeedometerApp() {
     val startTracking = {
         if (!permissionGranted) {
             permissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
-        } else if (android.os.Build.VERSION.SDK_INT >= 33 &&
-            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-        ) {
-            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         } else {
-            context.startForegroundService(
+            ContextCompat.startForegroundService(
+                context,
                 Intent(context, GpsTrackingService::class.java).setAction(GpsTrackingService.ACTION_START)
             )
         }
@@ -218,6 +214,7 @@ private fun SpeedometerApp() {
                             routeSummary = routeSummary,
                             routeError = routeError,
                             onRouteError = { routeError = it },
+                            mapsConfigured = BuildConfig.MAPS_API_KEY.isNotBlank(),
                             routeLoading = routeLoading,
                             onBuildRoute = {
                                 val origin = currentLatLng
@@ -391,6 +388,7 @@ private fun MapNavigationPane(
     routeSummary: String?,
     routeError: String?,
     onRouteError: (String) -> Unit,
+    mapsConfigured: Boolean,
     routeLoading: Boolean,
     onBuildRoute: () -> Unit,
     modifier: Modifier = Modifier
@@ -414,16 +412,32 @@ private fun MapNavigationPane(
 
     Column(modifier, verticalArrangement = Arrangement.spacedBy(7.dp)) {
         Box(Modifier.weight(1f).fillMaxWidth().clip(RoundedCornerShape(14.dp)).border(1.dp, Color(0xFF263442), RoundedCornerShape(14.dp))) {
-            GoogleMap(
-                modifier = Modifier.fillMaxSize(),
-                cameraPositionState = cameraState,
-                properties = MapProperties(isBuildingEnabled = true, isTrafficEnabled = false),
-                uiSettings = MapUiSettings(zoomControlsEnabled = false, compassEnabled = true, myLocationButtonEnabled = false)
-            ) {
-                currentLocation?.let { Marker(state = MarkerState(position = it), title = "Minha localização", snippet = "Posição GPS atual") }
-                if (routePoints.isNotEmpty()) {
-                    Polyline(points = routePoints, color = Accent, width = 10f)
-                    Marker(state = MarkerState(position = routePoints.last()), title = "Destino")
+            if (mapsConfigured) {
+                GoogleMap(
+                    modifier = Modifier.fillMaxSize(),
+                    cameraPositionState = cameraState,
+                    properties = MapProperties(isBuildingEnabled = true, isTrafficEnabled = false),
+                    uiSettings = MapUiSettings(zoomControlsEnabled = false, compassEnabled = true, myLocationButtonEnabled = false)
+                ) {
+                    currentLocation?.let { Marker(state = MarkerState(position = it), title = "Minha localização", snippet = "Posição GPS atual") }
+                    if (routePoints.isNotEmpty()) {
+                        Polyline(points = routePoints, color = Accent, width = 10f)
+                        Marker(state = MarkerState(position = routePoints.last()), title = "Destino")
+                    }
+                }
+            } else {
+                Column(
+                    Modifier.fillMaxSize().background(Panel).padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Icon(Icons.Default.Map, contentDescription = null, tint = Accent, modifier = Modifier.size(34.dp))
+                    Spacer(Modifier.height(8.dp))
+                    Text("MAPA NÃO CONFIGURADO", color = White, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                    Text(
+                        "A localização e o velocímetro continuam funcionando. Digite um destino e use o botão abaixo para abrir o Google Maps.",
+                        color = Muted, fontSize = 10.sp
+                    )
                 }
             }
             Surface(Modifier.align(Alignment.TopStart).padding(8.dp), color = Color(0xDD080B10), shape = RoundedCornerShape(8.dp)) {
