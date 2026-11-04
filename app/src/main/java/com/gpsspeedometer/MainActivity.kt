@@ -217,6 +217,7 @@ private fun SpeedometerApp() {
                             routePoints = routePoints,
                             routeSummary = routeSummary,
                             routeError = routeError,
+                            onRouteError = { routeError = it },
                             routeLoading = routeLoading,
                             onBuildRoute = {
                                 val origin = currentLatLng
@@ -389,6 +390,7 @@ private fun MapNavigationPane(
     routePoints: List<LatLng>,
     routeSummary: String?,
     routeError: String?,
+    onRouteError: (String) -> Unit,
     routeLoading: Boolean,
     onBuildRoute: () -> Unit,
     modifier: Modifier = Modifier
@@ -483,10 +485,10 @@ private fun MapNavigationPane(
                     try {
                         context.startActivity(Intent(Intent.ACTION_VIEW, uri))
                     } catch (_: Exception) {
-                        routeError = "Não foi possível abrir o Google Maps ou navegador neste dispositivo."
+                        onRouteError("Não foi possível abrir o Google Maps ou navegador neste dispositivo.")
                     }
                 } else {
-                    routeError = "Informe um destino antes de abrir a navegação."
+                    onRouteError("Informe um destino antes de abrir a navegação.")
                 }
             },
             contentPadding = PaddingValues(horizontal = 3.dp, vertical = 0.dp)
