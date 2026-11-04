@@ -87,6 +87,7 @@ private fun SpeedometerApp() {
     val tripDao = remember { tripDatabase.tripRecordDao() }
     val tripHistory by tripDao.observeAll().collectAsState(initial = emptyList())
     var showHistory by remember { mutableStateOf(false) }
+    var historyQuery by remember { mutableStateOf("") }
     var speed by remember { mutableFloatStateOf(0f) }
     var tripKm by remember { mutableDoubleStateOf(prefs.getFloat("trip_km", 0f).toDouble()) }
     var totalKm by remember { mutableDoubleStateOf(prefs.getFloat("total_km", 0f).toDouble()) }
@@ -115,13 +116,12 @@ private fun SpeedometerApp() {
     ) { grants ->
         permissionGranted = grants[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
             grants[Manifest.permission.ACCESS_COARSE_LOCATION] == true
-    }
-    val notificationPermissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) {
-        context.startForegroundService(
-            Intent(context, GpsTrackingService::class.java).setAction(GpsTrackingService.ACTION_START)
-        )
+        if (permissionGranted) {
+            ContextCompat.startForegroundService(
+                context,
+                Intent(context, GpsTrackingService::class.java).setAction(GpsTrackingService.ACTION_START)
+            )
+        }
     }
 
     LaunchedEffect(Unit) {
@@ -151,12 +151,9 @@ private fun SpeedometerApp() {
     val startTracking = {
         if (!permissionGranted) {
             permissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
-        } else if (android.os.Build.VERSION.SDK_INT >= 33 &&
-            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-        ) {
-            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         } else {
-            context.startForegroundService(
+            ContextCompat.startForegroundService(
+                context,
                 Intent(context, GpsTrackingService::class.java).setAction(GpsTrackingService.ACTION_START)
             )
         }
@@ -216,6 +213,8 @@ private fun SpeedometerApp() {
                             routePoints = routePoints,
                             routeSummary = routeSummary,
                             routeError = routeError,
+                            onRouteError = { routeError = it },
+                            mapsConfigured = BuildConfig.MAPS_API_KEY.isNotBlank(),
                             routeLoading = routeLoading,
                             onBuildRoute = {
                                 val origin = currentLatLng
@@ -223,7 +222,19 @@ private fun SpeedometerApp() {
                                 when {
                                     origin == null -> routeError = "Aguardando localização GPS para calcular a rota."
                                     target.isBlank() -> routeError = "Informe um destino."
-                                    BuildConfig.DIRECTIONS_API_KEY.isBlank() -> routeError = "Configure DIRECTIONS_API_KEY em local.properties."
+                                    BuildConfig.DIRECTIONS_API_KEY.isBlank() -> {
+                                        val uri = Uri.parse(
+                                            "https://www.google.com/maps/dir/?api=1" +
+                                                "&origin=${origin.latitude},${origin.longitude}" +
+                                                "&destination=${Uri.encode(target)}&travelmode=driving"
+                                        )
+                                        try {
+                                            context.startActivity(Intent(Intent.ACTION_VIEW, uri))
+                                            routeError = "Navegação aberta no Google Maps. Para desenhar a rota aqui, configure a Directions API."
+                                        } catch (_: Exception) {
+                                            routeError = "Não foi possível abrir um app de mapas neste dispositivo."
+                                        }
+                                    }
                                     else -> scope.launch {
                                         routeLoading = true
                                         routeError = null
@@ -293,36 +304,66 @@ private fun SpeedometerApp() {
                 onDismissRequest = { showHistory = false },
                 title = { Text("HISTÓRICO DE VIAGENS", fontWeight = FontWeight.Black) },
                 text = {
-                    if (tripHistory.isEmpty()) {
-                        Text("Nenhuma viagem salva ainda. Use FINALIZAR depois de percorrer uma distância para guardar o registro.")
-                    } else {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            items(tripHistory, key = { it.id }) { trip ->
-                                Column(
-                                    Modifier.fillMaxWidth().background(Panel, RoundedCornerShape(10.dp)).padding(10.dp)
-                                ) {
-                                    Text(
-                                        SimpleDateFormat("dd/MM/yyyy • HH:mm", Locale.getDefault()).format(Date(trip.finishedAt)),
-                                        color = Accent,
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Text(
-                                        String.format(Locale.getDefault(), "%.2f km  •  média %.1f km/h  •  máxima %.1f km/h", trip.distanceKm, trip.averageKmh, trip.maxSpeedKmh),
-                                        color = White,
-                                        fontSize = 11.sp
-                                    )
-                                    Text("Duração: ${trip.durationMillis / 60000} min", color = Muted, fontSize = 9.sp)
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        if (tripHistory.isNotEmpty()) {
+                            OutlinedTextField(
+                                value = historyQuery,
+                                onValueChange = { historyQuery = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                placeholder = { Text("Pesquisar por data, km ou velocidade") },
+                                leadingIcon = { Icon(Icons.Default.Refresh, contentDescription = null) },
+                                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp, color = White),
+                                shape = RoundedCornerShape(10.dp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = Accent,
+                                    unfocusedBorderColor = Color(0xFF263442),
+                                    focusedTextColor = White,
+                                    unfocusedTextColor = White
+                                )
+                            )
+                        }
+                        val normalizedQuery = historyQuery.trim()
+                        val matchingTrips = tripHistory.filter { trip ->
+                            val dateText = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
+                                .format(Date(trip.finishedAt))
+                            val searchable = dateText + " " + String.format(
+                                Locale.getDefault(), "%.2f %.1f %.1f",
+                                trip.distanceKm, trip.averageKmh, trip.maxSpeedKmh
+                            )
+                            normalizedQuery.isBlank() || searchable.contains(normalizedQuery, ignoreCase = true)
+                        }
+                        when {
+                            tripHistory.isEmpty() -> Text("Nenhuma viagem salva ainda. Use FINALIZAR depois de percorrer uma distância para guardar o registro.")
+                            matchingTrips.isEmpty() -> Text("Nenhuma viagem encontrada para essa pesquisa.", color = Muted)
+                            else -> LazyColumn(
+                                modifier = Modifier.fillMaxWidth().heightIn(max = 320.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                items(matchingTrips, key = { it.id }) { trip ->
+                                    Column(
+                                        Modifier.fillMaxWidth().background(Panel, RoundedCornerShape(10.dp)).padding(10.dp)
+                                    ) {
+                                        Text(
+                                            SimpleDateFormat("dd/MM/yyyy • HH:mm", Locale.getDefault()).format(Date(trip.finishedAt)),
+                                            color = Accent,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            String.format(Locale.getDefault(), "%.2f km  •  média %.1f km/h  •  máxima %.1f km/h", trip.distanceKm, trip.averageKmh, trip.maxSpeedKmh),
+                                            color = White,
+                                            fontSize = 11.sp
+                                        )
+                                        Text(String.format(Locale.getDefault(), "Duração: %d min", trip.durationMillis / 60000), color = Muted, fontSize = 9.sp)
+                                    }
                                 }
                             }
                         }
                     }
                 },
                 confirmButton = {
-                    TextButton(onClick = { showHistory = false }) { Text("FECHAR") }
+                    TextButton(onClick = { showHistory = false; historyQuery = "" }) { Text("FECHAR") }
                 },
                 dismissButton = {
                     if (tripHistory.isNotEmpty()) {
@@ -346,6 +387,8 @@ private fun MapNavigationPane(
     routePoints: List<LatLng>,
     routeSummary: String?,
     routeError: String?,
+    onRouteError: (String) -> Unit,
+    mapsConfigured: Boolean,
     routeLoading: Boolean,
     onBuildRoute: () -> Unit,
     modifier: Modifier = Modifier
@@ -369,16 +412,32 @@ private fun MapNavigationPane(
 
     Column(modifier, verticalArrangement = Arrangement.spacedBy(7.dp)) {
         Box(Modifier.weight(1f).fillMaxWidth().clip(RoundedCornerShape(14.dp)).border(1.dp, Color(0xFF263442), RoundedCornerShape(14.dp))) {
-            GoogleMap(
-                modifier = Modifier.fillMaxSize(),
-                cameraPositionState = cameraState,
-                properties = MapProperties(isBuildingEnabled = true, isTrafficEnabled = false),
-                uiSettings = MapUiSettings(zoomControlsEnabled = false, compassEnabled = true, myLocationButtonEnabled = false)
-            ) {
-                currentLocation?.let { Marker(state = MarkerState(position = it), title = "Minha localização", snippet = "Posição GPS atual") }
-                if (routePoints.isNotEmpty()) {
-                    Polyline(points = routePoints, color = Accent, width = 10f)
-                    Marker(state = MarkerState(position = routePoints.last()), title = "Destino")
+            if (mapsConfigured) {
+                GoogleMap(
+                    modifier = Modifier.fillMaxSize(),
+                    cameraPositionState = cameraState,
+                    properties = MapProperties(isBuildingEnabled = true, isTrafficEnabled = false),
+                    uiSettings = MapUiSettings(zoomControlsEnabled = false, compassEnabled = true, myLocationButtonEnabled = false)
+                ) {
+                    currentLocation?.let { Marker(state = MarkerState(position = it), title = "Minha localização", snippet = "Posição GPS atual") }
+                    if (routePoints.isNotEmpty()) {
+                        Polyline(points = routePoints, color = Accent, width = 10f)
+                        Marker(state = MarkerState(position = routePoints.last()), title = "Destino")
+                    }
+                }
+            } else {
+                Column(
+                    Modifier.fillMaxSize().background(Panel).padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Icon(Icons.Default.Map, contentDescription = null, tint = Accent, modifier = Modifier.size(34.dp))
+                    Spacer(Modifier.height(8.dp))
+                    Text("MAPA NÃO CONFIGURADO", color = White, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                    Text(
+                        "A localização e o velocímetro continuam funcionando. Digite um destino e use o botão abaixo para abrir o Google Maps.",
+                        color = Muted, fontSize = 10.sp
+                    )
                 }
             }
             Surface(Modifier.align(Alignment.TopStart).padding(8.dp), color = Color(0xDD080B10), shape = RoundedCornerShape(8.dp)) {
@@ -430,8 +489,20 @@ private fun MapNavigationPane(
             onClick = {
                 val query = destination.trim()
                 if (query.isNotEmpty()) {
-                    val uri = Uri.parse("https://www.google.com/maps/dir/?api=1&destination=${Uri.encode(query)}&travelmode=driving")
-                    context.startActivity(Intent(Intent.ACTION_VIEW, uri))
+                    val origin = currentLocation
+                    val originPart = origin?.let { "&origin=${it.latitude},${it.longitude}" } ?: ""
+                    val uri = Uri.parse(
+                        "https://www.google.com/maps/dir/?api=1" +
+                            originPart +
+                            "&destination=${Uri.encode(query)}&travelmode=driving"
+                    )
+                    try {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, uri))
+                    } catch (_: Exception) {
+                        onRouteError("Não foi possível abrir o Google Maps ou navegador neste dispositivo.")
+                    }
+                } else {
+                    onRouteError("Informe um destino antes de abrir a navegação.")
                 }
             },
             contentPadding = PaddingValues(horizontal = 3.dp, vertical = 0.dp)

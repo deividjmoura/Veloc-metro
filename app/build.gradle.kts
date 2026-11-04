@@ -25,9 +25,10 @@ android {
         applicationId = "com.gpsspeedometer"
         minSdk = 26
         targetSdk = 35
-        versionCode = 4
-        versionName = "0.4.0"
+        versionCode = 6
+        versionName = "0.4.2"
         manifestPlaceholders["MAPS_API_KEY"] = localProperties.getProperty("MAPS_API_KEY", "")
+        buildConfigField("String", "MAPS_API_KEY", "\"" + localProperties.getProperty("MAPS_API_KEY", "") + "\"")
         buildConfigField("String", "DIRECTIONS_API_KEY", "\"" + localProperties.getProperty("DIRECTIONS_API_KEY", "") + "\"")
     }
     buildFeatures { compose = true; buildConfig = true }

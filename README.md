@@ -29,6 +29,14 @@ Sem MAPS_API_KEY, o mapa pode ficar em branco. Sem DIRECTIONS_API_KEY, a rota in
 3. Aguarde a sincronização do Gradle.
 4. Execute em um aparelho Android com GPS e conceda a permissão de localização.
 
+## Funcionalidades 0.4.2
+- O serviço GPS inicia automaticamente após a permissão de localização ser concedida.
+- A tela de navegação permanece utilizável mesmo sem chave do Google Maps, com acesso à navegação externa.
+
+## Funcionalidades 0.4.1
+- Pesquisa no histórico por data, distância e velocidades média/máxima.
+- Quando a Directions API não está configurada, o botão de calcular rota abre a navegação externa com origem GPS e destino no Google Maps.
+
 ## Funcionalidades 0.4.0
 - Interface esportiva em orientação horizontal.
 - Velocímetro GPS com alternância km/h e mph.
@@ -44,7 +52,7 @@ Sem MAPS_API_KEY, o mapa pode ficar em branco. Sem DIRECTIONS_API_KEY, a rota in
 
 ## Histórico de viagens
 
-As viagens finalizadas pelo botão **FINALIZAR** são salvas localmente em banco Room. O painel **HISTÓRICO** permite consultar data, distância, duração, velocidade média e máxima; os registros permanecem no dispositivo e podem ser apagados pela opção **LIMPAR**.
+As viagens finalizadas pelo botão **FINALIZAR** são salvas localmente em banco Room. O painel **HISTÓRICO** permite pesquisar por data, distância e velocidades média/máxima, além de consultar duração; os registros permanecem no dispositivo e podem ser apagados pela opção **LIMPAR**.
 
 ## Testes automatizados
 
